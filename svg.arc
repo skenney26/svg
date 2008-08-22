@@ -174,15 +174,29 @@ Connection: close")
 
 (def grad (id angle . colors)
 	(tag (linearGradient id id gradientTransform (string "rotate(" angle ")"))
-		(each (sc o so) (tuples colors 3)
-			(tag (stop stop-color sc offset o stop-opacity so)))))
+		(each (sc so o) (tuples colors 3)
+			(tag (stop stop-color sc stop-opacity so offset o)))))
 
 (def rad (id . colors)
 	(tag (radialGradient id id cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
-		(each (sc o so) (tuples colors 3)
-			(tag (stop stop-color sc offset o stop-opacity so)))))
+		(each (sc so o) (tuples colors 3)
+			(tag (stop stop-color sc stop-opacity so offset o)))))
 
-(def path (d f (o o 1) (o s 'none) (o sw 1))
+; should r also be passed as an argument to radc ?
+
+(def radc (id cx cy . colors)
+	(tag (radialGradient id id cx cx cy cy r "50%" fx "50%" fy "50%")
+		(each (sc so o) (tuples colors 3)
+			(tag (stop stop-color sc stop-opacity so offset o)))))
+
+(def path (d s (o sw 1) (o o 1))
+	(tag (path d d stroke s stroke-width sw opacity o fill 'none)))
+
+(def roundpath (d s (o sw 1) (o o 1))
+	(tag (path d d stroke s stroke-width sw opacity o
+						 stroke-linejoin 'round stroke-linecap 'round fill 'none)))
+
+(def shape (d f (o o 1) (o s 'none) (o sw 1))
 	(tag (path d d fill f opacity o stroke s stroke-width sw)))
 
 (def line (ps s (o sw 1) (o o 1))
@@ -196,31 +210,34 @@ Connection: close")
 (def tri (x1 y1 x2 y2 x3 y3 f (o o 1) (o s 'none) (o sw 1))
 	(poly (list x1 y1 x2 y2 x3 y3) f o s sw))
 
-(mac slink (href . body)
+(mac svglink (href . body)
  `(tag (a xlink:href ,href)
 		,@body))
 
 (def image (href x y w h (o o 1))
 	(tag (image xlink:href href x x y y width w height h opacity o)))
 
-(mac defs args
+
+
+(mac svgid args
  `(tag defs
 		,@(map (fn ((id val))
 						`(let i ,id
 							 (if (in ',(car val) 'grad 'rad)
 									 (do (push i grads*)
-									 (,(car val) i ,@(cdr val)))
-							 (tag (g id i) ,val))))
+											 (,(car val) i ,@(cdr val)))
+									 (tag (g id i) ,val))))
 					 (pair args))))
 
-(def use (id (o x 0) (o y 0))
-	(if (mem id grads*)
-			(string "url(#" id ")")
-			(tag (use xlink:href (string "#" id) x x y y))))
+(mac use (id (o x 0) (o y x))
+ `(if (mem ,id grads*)
+			(string "url(#" ,id ")")
+			(tag (use xlink:href (string "#" ,id) x ,x y ,y))))
 
-(def mid ids
-	(each id ids
-		(use id "50%" "50%")))
+(mac mid ids
+ `(do ,@(map (fn (id)
+							 `(use ,id "50%"))
+						 ids)))
 
 
 
@@ -266,15 +283,15 @@ Connection: close")
 
 ; tests
 
-(svgop test-defs req
-	(defs 'grad1 (grad 0 (randcolor) "0%" 1
-											 (randcolor) "100%" 1)
+(svgop test-svgid req
+	(svgid 'grad1 (grad 0 (randcolor) "0%" 1
+												(randcolor) "100%" 1)
 				'circ1 (circ 100 100 100 (randcolor)))
 	(bg (use 'grad1))
 	(use 'circ1))
 
 (svgop test-step req
-	(defs 'sqrs (step x 10 100 10
+	(svgid 'sqrs (step x 10 100 10
 								(sqr x 100 50 'orange .4)))
 	(use 'sqrs))
 
@@ -286,10 +303,10 @@ Connection: close")
 ; examples
 
 (svgop swirl req
-	(defs'arm1	(step r 4 40 4
+	(svgid 'arm1	(step r 4 40 4
 								(rot r
 									(move (* r 3) 0
-										(circ 0 0 r 'white .2 'yellow 2))))
+										(circ 0 0 r 'white .2 'red 2))))
 			 'arms1 (rots 'arm1 120 360 120)
 			 'arm2	(step r 4 60 4
 								(rot r
@@ -298,7 +315,5 @@ Connection: close")
 			 'arms2 (rots 'arm2 60 300 120))
 	(bg 'black)
 	(mid 'arms1 'arms2))
-
-
 
 
