@@ -1,5 +1,10 @@
 ; skenney26@gmail.com
 
+
+; *** This is in the middle of a major rewrite ***
+; the examples at http://arcxs.posterous.com/ should work though
+
+
 ; respond from srv.arc has been redefined to allow multiple response types
 ; use defop for html and svgop for svg
 ; redirects haven't been re-implemented yet
@@ -295,8 +300,8 @@ Connection: close")
 								(sqr x 100 50 'orange .4)))
 	(use 'sqrs))
 
-; (mac mx (expr)
-;  `(ppr (macex1 ',expr)))
+(mac mx (expr)
+ `(ppr (macex1 ',expr)))
 
 
 
@@ -315,5 +320,84 @@ Connection: close")
 			 'arms2 (rots 'arm2 60 300 120))
 	(bg 'black)
 	(mid 'arms1 'arms2))
+
+
+
+; new mid
+
+(mac mid (expr)
+	(w/uniq u
+	 `(do (svgid ',u ,expr)
+				(use ',u "50%" "50%"))))
+
+(mac mid exprs
+	(let us (map [uniq] exprs)
+	 `(list ,@(map (fn (u e)
+								`(do (svgid ,u ,e)
+										 (use ,u "50%" "50%")))
+							 us exprs))))
+
+
+
+(mac mid exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (svgid u ,e)
+								 (use u "50%" "50%")))
+						 exprs)))
+
+(svgop test1 req
+	(mid (circ 0 0 200 'silver)))
+
+(svgop test2 req
+	(mid (circ 0 0 200 'silver)
+			 (circ 0 0 100 'blue)))
+
+(svgop test3 req
+  (mid (step r 1080 0 6
+				 (rot r
+					 (oval 0 0 r 20 'none 1 'black)))))
+
+(svgop test4 req
+  (mid (step s 3 1 .5
+         (scale s s
+           (shape "M 100 20
+                   Q 0 0 80 70
+                   Q 0 0 -50 90
+                   Q 0 0 -90 40
+                   Q 0 0 -40 -70
+                   Q 0 0 40 -80
+                   Q 0 0 100 20 Z"
+                  'purple .3)))))
+
+(svgop test5 req
+  (mid (circ 0 0 150 'yellow)
+       (circ -50 -50 30 'black)
+       (circ 50 -50 30 'black)
+       (roundpath "M -100 40 Q 0 140 100 40" 'black 15)))
+
+(svgop test6 req
+  (bg "#00ff00" .4))
+
+(svgop test7 req
+  (bg 'black)
+  (mid	(step a 120 360 120
+          (rot a
+            (step b 4 40 4
+              (rot b
+                (move (* b 3) 0
+                  (circ 0 0 b 'white .2 'yellow 2))))))
+        (step a 60 300 120
+          (rot a
+            (step b 4 60 4
+              (rot b
+                (move (* b 3) 0
+                  (circ 0 0 b 'white .1 "#00ffff" 2))))))))
+
+
+
+
+
+
 
 
