@@ -1,10 +1,6 @@
 ; skenney26@gmail.com
 
 
-; *** This is in the middle of a major rewrite ***
-; the examples at http://arcxs.posterous.com/ should work though
-
-
 ; respond from srv.arc has been redefined to allow multiple response types
 ; use defop for html and svgop for svg
 ; redirects haven't been re-implemented yet
@@ -68,9 +64,6 @@ Connection: close")
            ))))
 
 
-(= grads* nil)
-
-; overwrite or shadow grads*?
 
 (mac svgop (name parm . body)
   (w/uniq gs
@@ -80,8 +73,7 @@ Connection: close")
 				(prn)
 				(tag (svg xmlns "http://www.w3.org/2000/svg"
 									xmlns:xlink "http://www.w3.org/1999/xlink")
-					(let grads* nil
-						,@body))))))
+					,@body)))))
 
 
 
@@ -107,13 +99,20 @@ Connection: close")
 ; svg api
 
 (def circ (x y r f (o o 1) (o s 'none) (o sw 1))
-	(tag (circle cx x cy y r r fill f opacity o stroke s stroke-width sw)))
+	(tag (circle cx x cy y r r fill f
+							 opacity o stroke s stroke-width sw)))
 
 (def oval (x y rx ry f (o o 1) (o s 'none) (o sw 1))
-	(tag (ellipse cx x cy y rx rx ry ry fill f opacity o stroke s stroke-width sw)))
+	(tag (ellipse cx x cy y rx rx ry ry fill f
+								opacity o stroke s stroke-width sw)))
+
+(def ring (x y rx ry s (o sw 1) (o o 1))
+	(tag (ellipse cx x cy y rx rx ry ry fill 'none
+								stroke s stroke-width sw opacity o)))
 
 (def rect (x y w h f (o o 1) (o s 'none) (o sw 1))
-	(tag (rect x x y y width w height h fill f opacity o stroke s stroke-width sw)))
+	(tag (rect x x y y width w height h fill f
+						 opacity o stroke s stroke-width sw)))
 
 (def roundrect (x y w h rx ry f (o o 1) (o s 'none) (o sw 1))
 	(tag (rect x x y y width w height h rx rx ry ry
@@ -130,18 +129,22 @@ Connection: close")
 		,@body))
 
 (mac move (x y . body)
- `(trans (string "translate(" ,x "," ,y ")")
+ `(trans (string "translate(" ,x " " ,y ")")
 		,@body))
+
+(mac moves (v start stop by . body)
+ `(let ,v nil
+		(step ,v ,start ,stop ,by
+			(move ,v ,v ,@body))))
 
 (mac rot (angle . body)
  `(trans (string "rotate(" ,angle ")")
 		,@body))
 
-(mac rots (id start stop (o by 1))
-	(w/uniq (gv gi)
-	 `(with (,gv nil ,gi ,id)
-			(step ,gv ,start ,stop ,by
-				(rot ,gv (use ,gi))))))
+(mac rots (v start stop by . body)
+ `(let ,v nil
+		(step ,v ,start ,stop ,by
+			(rot ,v ,@body))))
 
 (mac rotc (angle cx cy . body)
  `(trans (string "rotate(" ,angle "," ,cx "," ,cy ")")
@@ -160,8 +163,13 @@ Connection: close")
 		(skewy ,y ,@body)))
 
 (mac scale (x y . body)
-	`(trans (string "scale(" ,x "," ,y ")")
+	`(trans (string "scale(" ,x " " ,y ")")
 		,@body))
+
+(mac scales (v start stop by . body)
+ `(let ,v nil
+		(step ,v ,start ,stop ,by
+			(scale ,v ,v ,@body))))
 
 (def bg (color (o opacity 1))
 	(rect 0 0 "100%" "100%" color opacity))
@@ -177,17 +185,21 @@ Connection: close")
 (def around (x y)
 	(+ x (between (- y) y)))
 
-(def grad (id angle . colors)
-	(tag (linearGradient id id gradientTransform (string "rotate(" angle ")"))
-		(each (sc so o) (tuples colors 3)
-			(tag (stop stop-color sc stop-opacity so offset o)))))
+(def grad (angle . colors)
+	(let u (uniq)
+		(tag (linearGradient id u gradientTransform (string "rotate(" angle ")"))
+			(each (color opac off) (tuples colors 3)
+				(tag (stop stop-color color stop-opacity opac offset off))))
+		(string "url(#" u ")")))
 
-(def rad (id . colors)
-	(tag (radialGradient id id cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
-		(each (sc so o) (tuples colors 3)
-			(tag (stop stop-color sc stop-opacity so offset o)))))
+(def rad colors
+	(let u (uniq)
+		(tag (radialGradient id u cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
+			(each (color opac off) (tuples colors 3)
+				(tag (stop stop-color color stop-opacity opac offset off))))
+		(string "url(#" u ")")))
 
-; should r also be passed as an argument to radc ?
+
 
 (def radc (id cx cy . colors)
 	(tag (radialGradient id id cx cx cy cy r "50%" fx "50%" fy "50%")
@@ -204,13 +216,23 @@ Connection: close")
 (def shape (d f (o o 1) (o s 'none) (o sw 1))
 	(tag (path d d fill f opacity o stroke s stroke-width sw)))
 
+
+(def spaces args
+	(tostring (apply prs args)))
+
 (def line (ps s (o sw 1) (o o 1))
 	(tag (polyline points (tostring:prall ps "" " ")
 								 fill 'none stroke s stroke-width sw opacity o)))
 
 (def poly (ps f (o o 1) (o s 'none) (o sw 1))
-	(tag (polygon points (tostring:prall ps "" " ")
+	(tag (polygon points (apply spaces ps)
 								fill f opacity o stroke s stroke-width sw)))
+
+(def poly (ps f (o o 1) (o s 'none) (o sw 1))
+	(let u (uniq)
+		(tag (polygon id u points (apply spaces ps)
+									fill f opacity o stroke s stroke-width sw))
+		u))
 
 (def tri (x1 y1 x2 y2 x3 y3 f (o o 1) (o s 'none) (o sw 1))
 	(poly (list x1 y1 x2 y2 x3 y3) f o s sw))
@@ -222,27 +244,65 @@ Connection: close")
 (def image (href x y w h (o o 1))
 	(tag (image xlink:href href x x y y width w height h opacity o)))
 
+; incorporate these into the above definitions soon
 
+(def svg-id (id)
+	(string "#" id))
 
-(mac svgid args
- `(tag defs
-		,@(map (fn ((id val))
-						`(let i ,id
-							 (if (in ',(car val) 'grad 'rad)
-									 (do (push i grads*)
-											 (,(car val) i ,@(cdr val)))
-									 (tag (g id i) ,val))))
-					 (pair args))))
+(def svg-url (id)
+	(string "url(#" id ")"))
 
-(mac use (id (o x 0) (o y x))
- `(if (mem ,id grads*)
-			(string "url(#" ,id ")")
-			(tag (use xlink:href (string "#" ,id) x ,x y ,y))))
+(mac blur (n . body)
+ `(withs (u (uniq)
+					url (svg-url u))
+		(tag (filter id u)
+			(tag (feGaussianBlur stdDeviation ,n)))
+		(tag (g filter url)
+			,@body)
+		url))
 
-(mac mid ids
- `(do ,@(map (fn (id)
-							 `(use ,id "50%"))
-						 ids)))
+(def curve (x1 y1 x2 y2 s (o w 1) (o o 1))
+	(let u (uniq)
+		(tag (path d (tostring:prs "M 0 0 Q" x1 y1 x2 y2)
+							 stroke s stroke-width w opacity o fill 'none))
+		u))
+
+(def use (id (o x 0) (o y x))
+	(tag (use xlink:href (string "#" id) x x y y)))
+
+; abstract mid, left, etc into poser, a mac-writing mac
+
+(mac mid exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use u "50%" "50%")))
+						 exprs)))
+
+(mac left exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use u 0 "50%")))
+						 exprs)))
+
+(mac right exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use u "100%" "50%")))
+						 exprs)))
+
+(mac top exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use u "50%" 0)))
+						 exprs)))
 
 
 
@@ -288,63 +348,10 @@ Connection: close")
 
 ; tests
 
-(svgop test-svgid req
-	(svgid 'grad1 (grad 0 (randcolor) "0%" 1
-												(randcolor) "100%" 1)
-				'circ1 (circ 100 100 100 (randcolor)))
-	(bg (use 'grad1))
-	(use 'circ1))
-
-(svgop test-step req
-	(svgid 'sqrs (step x 10 100 10
-								(sqr x 100 50 'orange .4)))
-	(use 'sqrs))
 
 (mac mx (expr)
  `(ppr (macex1 ',expr)))
 
-
-
-; examples
-
-(svgop swirl req
-	(svgid 'arm1	(step r 4 40 4
-								(rot r
-									(move (* r 3) 0
-										(circ 0 0 r 'white .2 'red 2))))
-			 'arms1 (rots 'arm1 120 360 120)
-			 'arm2	(step r 4 60 4
-								(rot r
-									(move (* r 3) 0
-										(circ 0 0 r 'white .1 "#00ffff" 2))))
-			 'arms2 (rots 'arm2 60 300 120))
-	(bg 'black)
-	(mid 'arms1 'arms2))
-
-
-
-; new mid
-
-(mac mid (expr)
-	(w/uniq u
-	 `(do (svgid ',u ,expr)
-				(use ',u "50%" "50%"))))
-
-(mac mid exprs
-	(let us (map [uniq] exprs)
-	 `(list ,@(map (fn (u e)
-								`(do (svgid ,u ,e)
-										 (use ,u "50%" "50%")))
-							 us exprs))))
-
-
-
-(mac mid exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (svgid u ,e)
-								 (use u "50%" "50%")))
-						 exprs)))
 
 (svgop test1 req
 	(mid (circ 0 0 200 'silver)))
@@ -393,6 +400,90 @@ Connection: close")
               (rot b
                 (move (* b 3) 0
                   (circ 0 0 b 'white .1 "#00ffff" 2))))))))
+
+(svgop test8 req
+  (bg 'red .5)
+  (mid (rots a 120 360 120
+         (rots b 4 40 4
+           (move (* b 3) 0
+             (circ 0 0 b 'white .3 'black 2))))
+       (rots a 60 300 120
+         (rots b 4 60 4
+           (move (* b 3) 0
+             (circ 0 0 b 'white .15 'black 2))))))
+
+(svgop test9 req
+  (mid (rots r 1080 0 6
+         (oval 0 0 r 20 'none 1 'black))))
+
+(svgop test10 req
+  (mid (scales s 3 1 .5
+         (shape "M 100 20
+                 Q 0 0 80 70
+                 Q 0 0 -50 90
+                 Q 0 0 -90 40
+                 Q 0 0 -40 -70
+                 Q 0 0 40 -80
+                 Q 0 0 100 20 Z"
+                'purple .3))))
+
+(svgop test11 req
+	(bg 'black)
+  (mid (rots r 1080 0 6
+         (ring 0 0 r 20 'white))))
+
+(svgop test12 req
+	(bg 'black)
+  (mid (rots r 1080 0 6
+         (ring 0 0 r 20 'white 3 .4))))
+
+(svgop test13 req
+	(bg 'black)
+  (mid (rots r 1080 0 6
+         (ring 0 0 r 20 'white 5 .3))))
+
+(svgop test14 req
+	(bg 'black)
+  (mid (rots r 1080 0 6
+         (ring 0 0 r 20 'maroon 25 .1))))
+
+(svgop test15 req
+	(circ 100 100 50
+				(grad 0 (randcolor) 1 "0%"
+								(randcolor) 1 "100%")))
+
+(svgop test16 req
+	(let g (grad 0 (randcolor) 1 "0%"
+								 (randcolor) 1 "100%")
+		(circ 100 100 50 g)
+		(sqr  100 300 100 g)))
+
+
+; move all tests into another file
+
+(svgop blur1 req
+	(blur 5 (sqr 100 100 100 'orange)))
+
+(svgop blur2 req
+	(bg 'black)
+	(left (blur 10
+					(step y -200 200 20
+						(curve 500 0 1500 y 'orange)))))
+
+(svgop blur3 req
+	(bg 'black)
+	(left (blur 2
+					(step y -400 400 40
+						(curve 500 0 1500 y 'white .5)))))
+
+(svgop blur4 req
+	(bg 'black)
+	(top (blur 7
+				 (rots r 45 135 15
+					 (step y -200 200 20
+						 (curve 400 0 1200 y 'red))))))
+
+
 
 
 
