@@ -132,6 +132,12 @@ Connection: close")
  `(trans (string "translate(" ,x " " ,y ")")
 		,@body))
 
+(mac movex (x . body)
+ `(move x 0 ,@body))
+
+(mac movey (y . body)
+ `(move 0 y ,@body))
+
 (mac moves (v start stop by . body)
  `(let ,v nil
 		(step ,v ,start ,stop ,by
@@ -190,6 +196,20 @@ Connection: close")
 		(tag (linearGradient id u gradientTransform (string "rotate(" angle ")"))
 			(each (color opac off) (tuples colors 3)
 				(tag (stop stop-color color stop-opacity opac offset off))))
+		(string "url(#" u ")")))
+
+(def grad1 (angle color)
+	(let u (uniq)
+		(tag (linearGradient id u gradientTransform (string "rotate(" angle ")"))
+			(tag (stop stop-color color stop-opacity 1 offset 0))
+			(tag (stop stop-color color stop-opacity 0 offset 1)))
+		(string "url(#" u ")")))
+
+(def grad2 (angle color1 color2)
+	(let u (uniq)
+		(tag (linearGradient id u gradientTransform (string "rotate(" angle ")"))
+			(tag (stop stop-color color1 stop-opacity 1 offset 0))
+			(tag (stop stop-color color2 stop-opacity 1 offset 1)))
 		(string "url(#" u ")")))
 
 (def rad colors
@@ -288,6 +308,14 @@ Connection: close")
 								 (use u 0 "50%")))
 						 exprs)))
 
+(mac botleft exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use u 0 "100%")))
+						 exprs)))
+
 (mac right exprs
  `(do ,@(map (fn (e)
 							`(let u (uniq)
@@ -308,6 +336,7 @@ Connection: close")
 
 ; iterators
 
+
 (mac step (v init end by . body)
 	(w/uniq (gi ge gtest gupdate)
 		`(withs (,v nil ,gi ,init ,ge ,end
@@ -317,6 +346,22 @@ Connection: close")
 						(,gtest ,v ,ge)
 						(set ,v (,gupdate ,v ,by))
 				,@body))))
+
+; each with index
+; (eachi e i '(a b c) (prn i #\space e))
+
+(mac eachi (v i expr . body)
+	(w/uniq (gseq g)
+		`(let ,gseq ,expr
+			 (if (alist ,gseq)
+			 			((afn (,g ,i)
+							 (when (acons ,g)
+							 	 (let ,v (car ,g)
+								 	 ,@body
+									 (self (cdr ,g) (++ ,i)))))
+						 ,gseq 0)
+					 (forlen ,i 0 ,gseq
+						 (let ,v (,gseq ,i) ,@body))))))
 
 (mac pass (x y low high . body)
 	(w/uniq gh
@@ -465,23 +510,31 @@ Connection: close")
 	(blur 5 (sqr 100 100 100 'orange)))
 
 (svgop blur2 req
-	(bg 'black)
-	(left (blur 10
-					(step y -200 200 20
-						(curve 500 0 1500 y 'orange)))))
+  (bg 'black)
+  (left (blur 10
+          (step y -200 200 20
+            (curve 500 0 1500 y 'orange)))))
 
 (svgop blur3 req
-	(bg 'black)
-	(left (blur 2
-					(step y -400 400 40
-						(curve 500 0 1500 y 'white .5)))))
+  (bg 'black)
+  (left (blur 2
+          (step y -400 400 40
+            (curve 500 0 1500 y 'white .5)))))
 
 (svgop blur4 req
-	(bg 'black)
-	(top (blur 7
-				 (rots r 45 135 15
-					 (step y -200 200 20
-						 (curve 400 0 1200 y 'red))))))
+  (bg 'black)
+  (top (blur 7
+         (rots r 45 135 15
+           (step y -200 200 20
+             (curve 400 0 1200 y 'red))))))
+
+(svgop test-grad1 req
+	(sqr 100 100 400
+			 (grad1 0 (randcolor))))
+
+(svgop test-grad2 req
+	(sqr 100 100 400
+			 (grad2 0 (randcolor) (randcolor))))
 
 
 
