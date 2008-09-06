@@ -96,86 +96,214 @@ Connection: close")
 
 
 
-; svg api
+; ITERATORS
 
-(def circ (x y r f (o o 1) (o s 'none) (o sw 1))
-	(tag (circle cx x cy y r r fill f
-							 opacity o stroke s stroke-width sw)))
 
-(def oval (x y rx ry f (o o 1) (o s 'none) (o sw 1))
-	(tag (ellipse cx x cy y rx rx ry ry fill f
-								opacity o stroke s stroke-width sw)))
+(mac step (v init end by . body)
+	(w/uniq (gi ge gtest gupdate)
+		`(withs (,v nil ,gi ,init ,ge ,end
+						 ,gtest		(if (< ,gi ,ge) <= >=)
+						 ,gupdate (if (< ,gi ,ge) + -))
+			(loop (set ,v ,gi)
+						(,gtest ,v ,ge)
+						(set ,v (,gupdate ,v ,by))
+				,@body))))
 
-(def ring (x y rx ry s (o sw 1) (o o 1))
-	(tag (ellipse cx x cy y rx rx ry ry fill 'none
-								stroke s stroke-width sw opacity o)))
+; each with index
+; (eachi e i '(a b c) (prn i #\space e))
 
-(def rect (x y w h f (o o 1) (o s 'none) (o sw 1))
-	(tag (rect x x y y width w height h fill f
-						 opacity o stroke s stroke-width sw)))
+(mac eachi (v i expr . body)
+	(w/uniq (gseq g)
+		`(let ,gseq ,expr
+			 (if (alist ,gseq)
+			 			((afn (,g ,i)
+							 (when (acons ,g)
+							 	 (let ,v (car ,g)
+								 	 ,@body
+									 (self (cdr ,g) (++ ,i)))))
+						 ,gseq 0)
+					 (forlen ,i 0 ,gseq
+						 (let ,v (,gseq ,i) ,@body))))))
 
-(def roundrect (x y w h rx ry f (o o 1) (o s 'none) (o sw 1))
-	(tag (rect x x y y width w height h rx rx ry ry
-						 fill f opacity o stroke s stroke-width sw)))
+(mac pass (x y low high . body)
+	(w/uniq gh
+	 `(with (,x nil ,y nil ,gh ,high)
+			(loop (do (set ,x ,low)
+								(set ,y ,gh))
+						(<= ,x ,gh)
+						(do (set ,x (+ ,x 1))
+								(set ,y (- ,y 1)))
+				,@body))))
 
-(def sqr (x y w f (o o 1) (o s 'none) (o sw 1))
-	(rect x y w w f o s sw))
+; (meet i j 0 10 (prn i " " j))
 
-(def roundsqr (x y w r f (o o 1) (o s 'none) (o sw 1))
-	(roundrect x y w w r r f o s sw))
+(mac meet (x y low high . body)
+ `(with (,x nil ,y nil)
+		(loop (do (set ,x ,low)
+							(set ,y ,high))
+					(<= ,x ,y)
+					(do (set ,x (+ ,x 1))
+							(set ,y (- ,y 1)))
+			,@body)))
 
-(mac trans (transform . body)
-	`(tag (g transform ,transform)
+(mac saw (x y init mid . body)
+	(w/uniq (gi gm gup)
+		`(with (,x nil ,y nil ,gi ,init ,gm ,mid ,gup t)
+			(loop (do (set ,x ,gi)
+								(set ,y ,gi))
+						(>= ,x ,gi)
+						(do (if (is ,x ,gm) (set ,gup nil))
+								(set ,x ((if ,gup + -) ,x 1))
+								(set ,y (+ ,y 1)))
+				,@body))))
+
+(mac hop (start group var expr . body)
+	`(each ,var (map [_ ,start]
+								(tuples ,expr ,group))
 		,@body))
 
+
+
+
+; SVG API
+
+(def svg-id (id)
+	(string "#" id))
+
+(def svg-url (id)
+	(string "url(#" id ")"))
+
+(def oval (x y rx ry fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(let u (uniq)
+		(tag (ellipse id u cx x cy y rx rx ry ry fill fill
+									opacity opacity stroke stroke stroke-width stroke-width))
+		(svg-id u)))
+
+(def oval0 (rx ry fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(oval 0 0 rx ry fill opacity stroke stroke-width))
+
+(def ring (x y rx ry color (o stroke-width 1) (o opacity 1))
+	(oval x y rx ry 'none opacity color stroke-width))
+
+(def ring0 (rx ry color (o stroke-width 1) (o opacity 1))
+	(ring 0 0 rx ry color stroke-width opacity))
+
+(def circ (x y radius fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(oval x y radius radius fill opacity stroke stroke-width))
+
+(def circ0 (radius fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(circ 0 0 radius fill opacity stroke stroke-width))
+
+(def roundrect (x y width height rx ry fill
+								(o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(let u (uniq)
+		(tag (rect id u x x y y width width height height rx rx ry ry fill fill
+							 opacity opacity stroke stroke stroke-width stroke-width))
+		(svg-id u)))
+
+(def roundrect0 (width height rx ry fill
+								 (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(roundrect 0 0 width height rx ry fill opacity stroke stroke-width))
+
+(def rect (x y width height fill
+					 (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(roundrect x y width height 0 0 fill opacity stroke stroke-width))
+
+(def rect0 (width height fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(rect 0 0 width height fill opacity stroke stroke-width))
+
+(def roundsqr (x y width r fill
+							 (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(roundrect x y width width r r fill opacity stroke stroke-width))
+
+(def roundsqr0 (width r fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(roundsqr 0 0 width r fill opacity stroke stroke-width))
+
+(def sqr (x y width fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(roundsqr x y width 0 fill opacity stroke stroke-width))
+
+(def sqr0 (width fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(sqr 0 0 width fill opacity stroke stroke-width))
+
+(mac transform (trans . body)
+ `(let u (uniq)
+		(tag (g id u transform ,trans)
+			,@body)
+		(svg-id u)))
+
 (mac move (x y . body)
- `(trans (string "translate(" ,x " " ,y ")")
+ `(transform (string "translate(" ,x " " ,y ")")
 		,@body))
 
 (mac movex (x . body)
- `(move x 0 ,@body))
+ `(move ,x 0 ,@body))
 
 (mac movey (y . body)
- `(move 0 y ,@body))
+ `(move 0 ,y ,@body))
 
-(mac moves (v start stop by . body)
+(mac stepmove (v init end by . body)
  `(let ,v nil
-		(step ,v ,start ,stop ,by
+		(step ,v ,init ,end ,by
 			(move ,v ,v ,@body))))
 
+(mac stepmove (v init end by . body)
+ `(with (,v nil u (uniq))
+		(tag (g id u)
+			(step ,v ,init ,end ,by
+				(move ,v ,v ,@body)))
+		(svg-id u)))
+
 (mac rot (angle . body)
- `(trans (string "rotate(" ,angle ")")
+ `(transform (string "rotate(" ,angle ")")
 		,@body))
 
-(mac rots (v start stop by . body)
- `(let ,v nil
-		(step ,v ,start ,stop ,by
-			(rot ,v ,@body))))
+(mac steprot (v init end by . body)
+ `(with (,v nil u (uniq))
+		(tag (g id u)
+			(step ,v ,init ,end ,by
+				(rot ,v ,@body)))
+		(svg-id u)))
 
-(mac rotc (angle cx cy . body)
- `(trans (string "rotate(" ,angle "," ,cx "," ,cy ")")
+(mac rotmid (angle cx cy . body)
+ `(transform (string "rotate(" ,angle " " ,cx " " ,cy ")")
 		,@body))
 
 (mac skewx (x . body)
-	`(trans (string "skewX(" ,x ")")
+ `(transform (string "skewX(" ,x ")")
 		,@body))
 
 (mac skewy (y . body)
-	`(trans (string "skewY(" ,y ")")
+ `(transform (string "skewY(" ,y ")")
 		,@body))
 
 (mac skew (x y . body)
-	`(skewx ,x
+ `(skewx ,x
 		(skewy ,y ,@body)))
 
 (mac scale (x y . body)
-	`(trans (string "scale(" ,x " " ,y ")")
+ `(transform (string "scale(" ,x " " ,y ")")
 		,@body))
 
-(mac scales (v start stop by . body)
- `(let ,v nil
-		(step ,v ,start ,stop ,by
-			(scale ,v ,v ,@body))))
+(mac scalex (x . body)
+ `(scale ,x 1 ,@body))
+
+(mac scaley (y . body)
+ `(scale 1 ,y ,@body))
+
+(mac stepscale (v init end by . body)
+ `(with (,v nil u (uniq))
+		(tag (g id u)
+			(step ,v ,init ,end ,by
+				(scale ,v ,v ,@body)))
+		(svg-id u)))
+
+
+
+
+
+
+
+
 
 (def bg (color (o opacity 1))
 	(rect 0 0 "100%" "100%" color opacity))
@@ -245,10 +373,6 @@ Connection: close")
 								 fill 'none stroke s stroke-width sw opacity o)))
 
 (def poly (ps f (o o 1) (o s 'none) (o sw 1))
-	(tag (polygon points (apply spaces ps)
-								fill f opacity o stroke s stroke-width sw)))
-
-(def poly (ps f (o o 1) (o s 'none) (o sw 1))
 	(let u (uniq)
 		(tag (polygon id u points (apply spaces ps)
 									fill f opacity o stroke s stroke-width sw))
@@ -263,14 +387,6 @@ Connection: close")
 
 (def image (href x y w h (o o 1))
 	(tag (image xlink:href href x x y y width w height h opacity o)))
-
-; incorporate these into the above definitions soon
-
-(def svg-id (id)
-	(string "#" id))
-
-(def svg-url (id)
-	(string "url(#" id ")"))
 
 (mac blur (n . body)
  `(withs (u (uniq)
@@ -290,6 +406,18 @@ Connection: close")
 (def use (id (o x 0) (o y x))
 	(tag (use xlink:href (string "#" id) x x y y)))
 
+(def use (id (o x 0) (o y x))
+	(tag (use xlink:href id x x y y)))
+
+
+
+; zeros ... origin (0, 0)
+
+(def tri0 (x2 y2 x3 y3 fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
+	(poly (list 0 0 x2 y2 x3 y3) fill opacity stroke stroke-width))
+
+
+
 ; abstract mid, left, etc into poser, a mac-writing mac
 
 (mac mid exprs
@@ -297,7 +425,7 @@ Connection: close")
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
-								 (use u "50%" "50%")))
+								 (use (svg-id u) "50%" "50%")))
 						 exprs)))
 
 (mac left exprs
@@ -305,7 +433,7 @@ Connection: close")
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
-								 (use u 0 "50%")))
+								 (use (svg-id u) 0 "50%")))
 						 exprs)))
 
 (mac botleft exprs
@@ -313,7 +441,7 @@ Connection: close")
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
-								 (use u 0 "100%")))
+								 (use (svg-id u) 0 "100%")))
 						 exprs)))
 
 (mac right exprs
@@ -321,7 +449,7 @@ Connection: close")
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
-								 (use u "100%" "50%")))
+								 (use (svg-id u) "100%" "50%")))
 						 exprs)))
 
 (mac top exprs
@@ -329,65 +457,11 @@ Connection: close")
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
-								 (use u "50%" 0)))
+								 (use (svg-id u) "50%" 0)))
 						 exprs)))
 
 
 
-; iterators
-
-
-(mac step (v init end by . body)
-	(w/uniq (gi ge gtest gupdate)
-		`(withs (,v nil ,gi ,init ,ge ,end
-						 ,gtest		(if (< ,gi ,ge) <= >=)
-						 ,gupdate (if (< ,gi ,ge) + -))
-			(loop (set ,v ,gi)
-						(,gtest ,v ,ge)
-						(set ,v (,gupdate ,v ,by))
-				,@body))))
-
-; each with index
-; (eachi e i '(a b c) (prn i #\space e))
-
-(mac eachi (v i expr . body)
-	(w/uniq (gseq g)
-		`(let ,gseq ,expr
-			 (if (alist ,gseq)
-			 			((afn (,g ,i)
-							 (when (acons ,g)
-							 	 (let ,v (car ,g)
-								 	 ,@body
-									 (self (cdr ,g) (++ ,i)))))
-						 ,gseq 0)
-					 (forlen ,i 0 ,gseq
-						 (let ,v (,gseq ,i) ,@body))))))
-
-(mac pass (x y low high . body)
-	(w/uniq gh
-		`(with (,x nil ,y nil ,gh ,high)
-			(loop (do (set ,x ,low)
-								(set ,y ,gh))
-						(<= ,x ,gh)
-						(do (set ,x (+ ,x 1))
-								(set ,y (- ,y 1)))
-				,@body))))
-
-(mac saw (x y init mid . body)
-	(w/uniq (gi gm gup)
-		`(with (,x nil ,y nil ,gi ,init ,gm ,mid ,gup t)
-			(loop (do (set ,x ,gi)
-								(set ,y ,gi))
-						(>= ,x ,gi)
-						(do (if (is ,x ,gm) (set ,gup nil))
-								(set ,x ((if ,gup + -) ,x 1))
-								(set ,y (+ ,y 1)))
-				,@body))))
-
-(mac hop (start group var expr . body)
-	`(each ,var (map [_ ,start]
-								(tuples ,expr ,group))
-		,@body))
 
 
 
