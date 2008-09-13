@@ -297,13 +297,53 @@ Connection: close")
 				(scale ,v ,v ,@body)))
 		(svg-id u)))
 
+(mac flipx body
+ `(scale -1 1 ,@body))
 
+(mac flipy body
+ `(scale 1 -1 ,@body))
 
+(mac flip body
+ `(scale -1 -1 ,@body))
 
+(def rad colors
+	(let u (uniq)
+		(tag (radialGradient id u cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
+			(each (color opac off) (tuples colors 3)
+				(tag (stop stop-color color stop-opacity opac offset off))))
+		(svg-url u)))
 
+(mac rad1 (color)
+	(w/uniq c
+	 `(let ,c ,color
+			(rad ,c 1 0 ,c 0 1))))
 
+(mac rad2 (color1 color2)
+ `(rad ,color1 1 0
+			 ,color2 1 1))
 
+(def video (vid x y w h)
+	(let u (uniq)
+		(tag (video id u xlink:href vid
+								x x y y width w height h))
+		(svg-id u)))
 
+(mac mask (m . body)
+ `(with (um (uniq) ub (uniq))
+		(tag defs
+			(tag (mask id um maskContentUnits "objectBoundingBox")
+				,m)
+			(tag (g id ub)
+				,@body))
+		(tag (use xlink:href (svg-id ub)
+							mask (svg-url um)))))
+
+(mac view (x y w h . body)
+ `(withs (u (uniq) s (svg-id u))
+		(tag (symbol id u viewBox (tostring:prs ,x ,y ,w ,h))
+			,@body)
+		(use s)
+		s))
 
 (def bg (color (o opacity 1))
 	(rect 0 0 "100%" "100%" color opacity))
@@ -318,6 +358,51 @@ Connection: close")
 
 (def around (x y)
 	(+ x (between (- y) y)))
+
+(def div args
+	(coerce (num (apply / args)) 'int))
+
+(def half (x)
+	(div x 2))
+
+(def negdiv args
+	(- (apply div args)))
+
+(def neghalf (x)
+	(negdiv x 2))
+
+(def path (pathstr color (o width 1) (o opacity 1))
+	(let u (uniq)
+		(tag (path id u d pathstr stroke color
+							 stroke-width width opacity opacity fill 'none))
+		(svg-id u)))
+
+(def roundpath (pathstr color (o width 1) (o opacity 1))
+	(let u (uniq)
+		(tag (path id u d pathstr stroke color stroke-width width opacity opacity
+							 stroke-linejoin 'round stroke-linecap 'round fill 'none))
+		(svg-id u)))
+
+
+; everything in the SVG API section above here has been rewritten
+; need to finish below
+
+
+
+
+(def shape (pathstr fill (o opac 1) (o stroke 'none) (o width 1))
+	(let u (uniq)
+		(tag (path id u d pathstr fill fill
+							 opacity opac stroke stroke stroke-width width))
+		(svg-id u)))
+
+(def text (str x y fill (o opacity) (o size) (o font) (o weight))
+	(let u (uniq)
+		(tag (text id u x x y y fill fill opacity opacity
+							 font-size size font-family font font-weight weight)
+			(pr str))
+		(svg-id u)))
+
 
 (def grad (angle . colors)
 	(let u (uniq)
@@ -340,13 +425,6 @@ Connection: close")
 			(tag (stop stop-color color2 stop-opacity 1 offset 1)))
 		(string "url(#" u ")")))
 
-(def rad colors
-	(let u (uniq)
-		(tag (radialGradient id u cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
-			(each (color opac off) (tuples colors 3)
-				(tag (stop stop-color color stop-opacity opac offset off))))
-		(string "url(#" u ")")))
-
 
 
 (def radc (id cx cy . colors)
@@ -354,15 +432,6 @@ Connection: close")
 		(each (sc so o) (tuples colors 3)
 			(tag (stop stop-color sc stop-opacity so offset o)))))
 
-(def path (d s (o sw 1) (o o 1))
-	(tag (path d d stroke s stroke-width sw opacity o fill 'none)))
-
-(def roundpath (d s (o sw 1) (o o 1))
-	(tag (path d d stroke s stroke-width sw opacity o
-						 stroke-linejoin 'round stroke-linecap 'round fill 'none)))
-
-(def shape (d f (o o 1) (o s 'none) (o sw 1))
-	(tag (path d d fill f opacity o stroke s stroke-width sw)))
 
 
 (def spaces args
@@ -428,12 +497,43 @@ Connection: close")
 								 (use (svg-id u) "50%" "50%")))
 						 exprs)))
 
+;(mac mid expr
+; `(withs (u (uniq) s (svg-id u))
+;		(tag defs
+;			(tag (g id u) ,expr))
+;		(use s "50%" "50%")
+;		s))
+
+(mac topleft exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use (svg-id u) 0 0)))
+						 exprs)))
+
 (mac left exprs
  `(do ,@(map (fn (e)
 							`(let u (uniq)
 								 (tag defs
 									 (tag (g id u) ,e))
 								 (use (svg-id u) 0 "50%")))
+						 exprs)))
+
+(mac botright exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use (svg-id u) "100%" "100%")))
+						 exprs)))
+
+(mac bot exprs
+ `(do ,@(map (fn (e)
+							`(let u (uniq)
+								 (tag defs
+									 (tag (g id u) ,e))
+								 (use (svg-id u) "50%" "100%")))
 						 exprs)))
 
 (mac botleft exprs
@@ -462,160 +562,8 @@ Connection: close")
 
 
 
-
-
-
-; tests
-
-
 (mac mx (expr)
  `(ppr (macex1 ',expr)))
-
-
-(svgop test1 req
-	(mid (circ 0 0 200 'silver)))
-
-(svgop test2 req
-	(mid (circ 0 0 200 'silver)
-			 (circ 0 0 100 'blue)))
-
-(svgop test3 req
-  (mid (step r 1080 0 6
-				 (rot r
-					 (oval 0 0 r 20 'none 1 'black)))))
-
-(svgop test4 req
-  (mid (step s 3 1 .5
-         (scale s s
-           (shape "M 100 20
-                   Q 0 0 80 70
-                   Q 0 0 -50 90
-                   Q 0 0 -90 40
-                   Q 0 0 -40 -70
-                   Q 0 0 40 -80
-                   Q 0 0 100 20 Z"
-                  'purple .3)))))
-
-(svgop test5 req
-  (mid (circ 0 0 150 'yellow)
-       (circ -50 -50 30 'black)
-       (circ 50 -50 30 'black)
-       (roundpath "M -100 40 Q 0 140 100 40" 'black 15)))
-
-(svgop test6 req
-  (bg "#00ff00" .4))
-
-(svgop test7 req
-  (bg 'black)
-  (mid	(step a 120 360 120
-          (rot a
-            (step b 4 40 4
-              (rot b
-                (move (* b 3) 0
-                  (circ 0 0 b 'white .2 'yellow 2))))))
-        (step a 60 300 120
-          (rot a
-            (step b 4 60 4
-              (rot b
-                (move (* b 3) 0
-                  (circ 0 0 b 'white .1 "#00ffff" 2))))))))
-
-(svgop test8 req
-  (bg 'red .5)
-  (mid (rots a 120 360 120
-         (rots b 4 40 4
-           (move (* b 3) 0
-             (circ 0 0 b 'white .3 'black 2))))
-       (rots a 60 300 120
-         (rots b 4 60 4
-           (move (* b 3) 0
-             (circ 0 0 b 'white .15 'black 2))))))
-
-(svgop test9 req
-  (mid (rots r 1080 0 6
-         (oval 0 0 r 20 'none 1 'black))))
-
-(svgop test10 req
-  (mid (scales s 3 1 .5
-         (shape "M 100 20
-                 Q 0 0 80 70
-                 Q 0 0 -50 90
-                 Q 0 0 -90 40
-                 Q 0 0 -40 -70
-                 Q 0 0 40 -80
-                 Q 0 0 100 20 Z"
-                'purple .3))))
-
-(svgop test11 req
-	(bg 'black)
-  (mid (rots r 1080 0 6
-         (ring 0 0 r 20 'white))))
-
-(svgop test12 req
-	(bg 'black)
-  (mid (rots r 1080 0 6
-         (ring 0 0 r 20 'white 3 .4))))
-
-(svgop test13 req
-	(bg 'black)
-  (mid (rots r 1080 0 6
-         (ring 0 0 r 20 'white 5 .3))))
-
-(svgop test14 req
-	(bg 'black)
-  (mid (rots r 1080 0 6
-         (ring 0 0 r 20 'maroon 25 .1))))
-
-(svgop test15 req
-	(circ 100 100 50
-				(grad 0 (randcolor) 1 "0%"
-								(randcolor) 1 "100%")))
-
-(svgop test16 req
-	(let g (grad 0 (randcolor) 1 "0%"
-								 (randcolor) 1 "100%")
-		(circ 100 100 50 g)
-		(sqr  100 300 100 g)))
-
-
-; move all tests into another file
-
-(svgop blur1 req
-	(blur 5 (sqr 100 100 100 'orange)))
-
-(svgop blur2 req
-  (bg 'black)
-  (left (blur 10
-          (step y -200 200 20
-            (curve 500 0 1500 y 'orange)))))
-
-(svgop blur3 req
-  (bg 'black)
-  (left (blur 2
-          (step y -400 400 40
-            (curve 500 0 1500 y 'white .5)))))
-
-(svgop blur4 req
-  (bg 'black)
-  (top (blur 7
-         (rots r 45 135 15
-           (step y -200 200 20
-             (curve 400 0 1200 y 'red))))))
-
-(svgop test-grad1 req
-	(sqr 100 100 400
-			 (grad1 0 (randcolor))))
-
-(svgop test-grad2 req
-	(sqr 100 100 400
-			 (grad2 0 (randcolor) (randcolor))))
-
-
-
-
-
-
-
 
 
 
