@@ -1,10 +1,10 @@
 ; skenney26@gmail.com
+; http://arcxs.posterous.com/
 
 
 ; respond from srv.arc has been redefined to allow multiple response types
 ; use defop for html and svgop for svg
 ; redirects haven't been re-implemented yet
-
 
 
 ; server changes/additions
@@ -97,6 +97,8 @@ Connection: close")
 
 
 ; ITERATORS
+; this file needs to be reorganized
+; there are some iterators at the bottom of the file
 
 
 (mac step (v init end by . body)
@@ -122,8 +124,8 @@ Connection: close")
 								 	 ,@body
 									 (self (cdr ,g) (++ ,i)))))
 						 ,gseq 0)
-					 (forlen ,i 0 ,gseq
-						 (let ,v (,gseq ,i) ,@body))))))
+						(for ,i 0 (- (len ,gseq) 1)
+							(let ,v (,gseq ,i) ,@body))))))
 
 (mac pass (x y low high . body)
 	(w/uniq gh
@@ -167,17 +169,23 @@ Connection: close")
 
 ; SVG API
 
-(def svg-id (id)
+(def svgid (id)
 	(string "#" id))
 
-(def svg-url (id)
+(def svgurl (id)
 	(string "url(#" id ")"))
+
+(mac group (id . body)
+	(w/uniq gi
+	 `(let ,gi ,id
+			(tag (g id ,gi) ,@body)
+			(svgid ,gi))))
 
 (def oval (x y rx ry fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
 	(let u (uniq)
 		(tag (ellipse id u cx x cy y rx rx ry ry fill fill
 									opacity opacity stroke stroke stroke-width stroke-width))
-		(svg-id u)))
+		(svgid u)))
 
 (def oval0 (rx ry fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
 	(oval 0 0 rx ry fill opacity stroke stroke-width))
@@ -199,7 +207,7 @@ Connection: close")
 	(let u (uniq)
 		(tag (rect id u x x y y width width height height rx rx ry ry fill fill
 							 opacity opacity stroke stroke stroke-width stroke-width))
-		(svg-id u)))
+		(svgid u)))
 
 (def roundrect0 (width height rx ry fill
 								 (o opacity 1) (o stroke 'none) (o stroke-width 1))
@@ -229,7 +237,7 @@ Connection: close")
  `(let u (uniq)
 		(tag (g id u transform ,trans)
 			,@body)
-		(svg-id u)))
+		(svgid u)))
 
 (mac move (x y . body)
  `(transform (string "translate(" ,x " " ,y ")")
@@ -241,6 +249,8 @@ Connection: close")
 (mac movey (y . body)
  `(move 0 ,y ,@body))
 
+; still working on stepmove, steprot, etc
+
 (mac stepmove (v init end by . body)
  `(let ,v nil
 		(step ,v ,init ,end ,by
@@ -251,7 +261,30 @@ Connection: close")
 		(tag (g id u)
 			(step ,v ,init ,end ,by
 				(move ,v ,v ,@body)))
-		(svg-id u)))
+		(svgid u)))
+
+(mac stepmove (init end by . body)
+	(w/uniq (id v)
+	 `(group ',id
+			(step ,v ,init ,end ,by
+				(move ,v ,v
+					,@body)))))
+
+(mac stepmovex (init end by . body)
+	(w/uniq (id v)
+	 `(group ',id
+			(step ,v ,init ,end ,by
+				(move ,v 0
+					,@body)))))
+
+(mac stepmovey (init end by . body)
+	(w/uniq (id v)
+	 `(group ',id
+			(step ,v ,init ,end ,by
+				(move 0 ,v 
+					,@body)))))
+
+
 
 (mac rot (angle . body)
  `(transform (string "rotate(" ,angle ")")
@@ -262,7 +295,7 @@ Connection: close")
 		(tag (g id u)
 			(step ,v ,init ,end ,by
 				(rot ,v ,@body)))
-		(svg-id u)))
+		(svgid u)))
 
 (mac rotmid (angle cx cy . body)
  `(transform (string "rotate(" ,angle " " ,cx " " ,cy ")")
@@ -295,7 +328,7 @@ Connection: close")
 		(tag (g id u)
 			(step ,v ,init ,end ,by
 				(scale ,v ,v ,@body)))
-		(svg-id u)))
+		(svgid u)))
 
 (mac flipx body
  `(scale -1 1 ,@body))
@@ -311,7 +344,7 @@ Connection: close")
 		(tag (radialGradient id u cx "50%" cy "50%" r "50%" fx "50%" fy "50%")
 			(each (color opac off) (tuples colors 3)
 				(tag (stop stop-color color stop-opacity opac offset off))))
-		(svg-url u)))
+		(svgurl u)))
 
 (mac rad1 (color)
 	(w/uniq c
@@ -326,7 +359,7 @@ Connection: close")
 	(let u (uniq)
 		(tag (video id u xlink:href vid
 								x x y y width w height h))
-		(svg-id u)))
+		(svgid u)))
 
 (mac mask (m . body)
  `(with (um (uniq) ub (uniq))
@@ -335,11 +368,11 @@ Connection: close")
 				,m)
 			(tag (g id ub)
 				,@body))
-		(tag (use xlink:href (svg-id ub)
-							mask (svg-url um)))))
+		(tag (use xlink:href (svgid ub)
+							mask (svgurl um)))))
 
 (mac view (x y w h . body)
- `(withs (u (uniq) s (svg-id u))
+ `(withs (u (uniq) s (svgid u))
 		(tag (symbol id u viewBox (tostring:prs ,x ,y ,w ,h))
 			,@body)
 		(use s)
@@ -359,8 +392,9 @@ Connection: close")
 (def around (x y)
 	(+ x (between (- y) y)))
 
+; hack - beware
 (def div args
-	(coerce (num (apply / args)) 'int))
+	(coerce (rem #\, (num (apply / args))) 'int))
 
 (def half (x)
 	(div x 2))
@@ -375,13 +409,13 @@ Connection: close")
 	(let u (uniq)
 		(tag (path id u d pathstr stroke color
 							 stroke-width width opacity opacity fill 'none))
-		(svg-id u)))
+		(svgid u)))
 
 (def roundpath (pathstr color (o width 1) (o opacity 1))
 	(let u (uniq)
 		(tag (path id u d pathstr stroke color stroke-width width opacity opacity
 							 stroke-linejoin 'round stroke-linecap 'round fill 'none))
-		(svg-id u)))
+		(svgid u)))
 
 
 ; everything in the SVG API section above here has been rewritten
@@ -394,14 +428,14 @@ Connection: close")
 	(let u (uniq)
 		(tag (path id u d pathstr fill fill
 							 opacity opac stroke stroke stroke-width width))
-		(svg-id u)))
+		(svgid u)))
 
 (def text (str x y fill (o opacity) (o size) (o font) (o weight))
 	(let u (uniq)
 		(tag (text id u x x y y fill fill opacity opacity
 							 font-size size font-family font font-weight weight)
 			(pr str))
-		(svg-id u)))
+		(svgid u)))
 
 
 (def grad (angle . colors)
@@ -459,7 +493,7 @@ Connection: close")
 
 (mac blur (n . body)
  `(withs (u (uniq)
-					url (svg-url u))
+					url (svgurl u))
 		(tag (filter id u)
 			(tag (feGaussianBlur stdDeviation ,n)))
 		(tag (g filter url)
@@ -472,98 +506,147 @@ Connection: close")
 							 stroke s stroke-width w opacity o fill 'none))
 		u))
 
-(def use (id (o x 0) (o y x))
-	(tag (use xlink:href (string "#" id) x x y y)))
 
 (def use (id (o x 0) (o y x))
 	(tag (use xlink:href id x x y y)))
 
-
-
-; zeros ... origin (0, 0)
 
 (def tri0 (x2 y2 x3 y3 fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
 	(poly (list 0 0 x2 y2 x3 y3) fill opacity stroke stroke-width))
 
 
 
-; abstract mid, left, etc into poser, a mac-writing mac
 
-(mac mid exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) "50%" "50%")))
-						 exprs)))
 
-;(mac mid expr
-; `(withs (u (uniq) s (svg-id u))
-;		(tag defs
-;			(tag (g id u) ,expr))
-;		(use s "50%" "50%")
-;		s))
+(mac poser (name x y)
+ `(mac ,name exprs
+		(w/uniq gs
+		 `(group ',gs
+				,@(map (fn (expr)
+								 (w/uniq g
+									`(do (tag defs
+												 (group ',g ,expr))
+											 (use (svgid ',g) ,,x ,,y))))
+							 exprs)))))
 
-(mac topleft exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) 0 0)))
-						 exprs)))
+(mac posers args
+ `(do ,@(map (fn (x)
+							`(poser ,@x))
+						 (tuples args 3))))
 
-(mac left exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) 0 "50%")))
-						 exprs)))
+(posers topleft				 0			0
+				top				 "50%"			0
+				topright	"100%"			0
+				right			"100%"	"50%"
+				botright	"100%" "100%"
+				bot				 "50%" "100%"
+				botleft				 0 "100%"
+				left					 0	"50%"
+				mid				 "50%"	"50%")
 
-(mac botright exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) "100%" "100%")))
-						 exprs)))
+(mac defsvg body
+	(w/uniq u
+	 `(do (tag defs
+					(group ',u ,@body))
+				(svgid ',u))))
 
-(mac bot exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) "50%" "100%")))
-						 exprs)))
-
-(mac botleft exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) 0 "100%")))
-						 exprs)))
-
-(mac right exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) "100%" "50%")))
-						 exprs)))
-
-(mac top exprs
- `(do ,@(map (fn (e)
-							`(let u (uniq)
-								 (tag defs
-									 (tag (g id u) ,e))
-								 (use (svg-id u) "50%" 0)))
-						 exprs)))
+(mac w/svg (parms . body)
+ `((fn ,(map1 car (pair parms))
+		,@body)
+	 ,@(map (fn (p)
+					 `(defsvg ,(cadr p)))
+					(pair parms))))
 
 
 
 (mac mx (expr)
  `(ppr (macex1 ',expr)))
 
+
+(mac corners body
+	(w/uniq g
+	 `(w/svg (,g ,@body)
+			(topleft	(use ,g))
+			(topright (use ,g))
+			(botright (use ,g))
+			(botleft	(use ,g)))))
+
+(mac sides body
+	(w/uniq g
+	 `(w/svg (,g ,@body)
+			(top	 (use ,g))
+			(right (use ,g))
+			(bot	 (use ,g))
+			(left	 (use ,g)))))
+
+(svgop bigtest1 req
+	(w/svg (c (topleft
+							(circ0 100 'silver)
+							(circ0	75 'maroon)
+							(circ0	50 'silver)
+							(circ0  25 'maroon)))
+		(mid (use c))))
+
+(svgop bigtest2 req
+	(w/svg (c (topleft
+							(circ0 100 'silver)
+							(circ0	75 'maroon)
+							(circ0	50 'silver)
+							(circ0  25 'maroon)))
+		(corners (use c))))
+
+(svgop bigtest3 req
+	(w/svg (c (topleft
+							(circ0 100 'silver)
+							(circ0	75 'maroon)
+							(circ0	50 'silver)
+							(circ0  25 'maroon)))
+		(corners (use c))
+		(sides (circ0 50 'lime))))
+
+
+
+; sin and cos were added to ac.scm
+
+(= pi 3.14159)
+
+(mac sincos (x y init end by . body)
+	(w/uniq g
+	 `(with (,(carif x) nil ,(carif y) nil)
+			(step ,g ,init ,end ,by
+				(with (,(carif x) (* (sin ,g) ,(if (acons x) (cadr x) 1))
+							 ,(carif y) (* (cos ,g) ,(if (acons y) (cadr y) 1)))
+					,@body)))))
+
+(mac sinwave (x y init end by . body)
+ `(with (,x nil ,(carif y) nil)
+		(step ,x ,init ,end ,by
+			(let ,(carif y) (* (sin ,x) ,(if (acons y) (cadr y) 1))
+				,@body))))
+
+(mac coswave (x y init end by . body)
+ `(with (,x nil ,(carif y) nil)
+		(step ,x ,init ,end ,by
+			(let ,(carif y) (* (cos ,x) ,(if (acons y) (cadr y) 1))
+				,@body))))
+
+(svgop waves req
+  (let (c1 c2 c3) (n-of 3 (randcolor))
+    (step y 200 400 100
+      (movey y
+        (step x 0 1400 2
+          (circ x (* (sin x) 25) 5 (rotate c1 c2 c3) .5))))))
+
+(svgop redwaves req
+  (bg 'black)
+  (stepmovey 200 400 100
+    (sinwave x (y 25) 0 1400 2
+      (circ x y 5 'red .5))))
+
+(svgop sc req
+  (bg 'black)
+  (mid
+    (sincos (x 150) (y 150) 0 12 1
+      (circ x y 150 'red .25 'white))))
 
 
