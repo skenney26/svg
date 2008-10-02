@@ -187,33 +187,11 @@
 
 
 
-(svgop sanfran req
-	(with (x 200
-				 randcirc [circ (+ (* (car  _) 40) (between 15 50))
-												(+ (* (cadr _) 40) (between 15 50))
-												(between 3 10)
-												(randcolor)
-												.6])
-		(each letter '(s a n)
-			(move x 100
-				(++ x 200)
-				(each p (points* letter)
-					(repeat 25
-						(randcirc p)))))
-		(move 300 330
-			(let x 0
-				(each letter '(f r a n)
-					(move x 0
-						(++ x 200)
-						(each p (points* letter)
-							(repeat 25
-								(randcirc p)))))))))
-
-
-
-
-
-
-
+(svgop nerd req
+  (move 130 180
+    (eachi e i "nerd"
+      (movex (* i 260)
+        (each (x y) (points* e)
+          (roundsqr (* x 50) (* y 50) 50 10 'green))))))
 
 
