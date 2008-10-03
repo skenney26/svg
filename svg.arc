@@ -97,8 +97,6 @@ Connection: close")
 
 
 ; ITERATORS
-; this file needs to be reorganized
-; there are some iterators at the bottom of the file
 
 
 (mac step (v init end by . body)
@@ -232,6 +230,15 @@ Connection: close")
 
 (def sqr0 (width fill (o opacity 1) (o stroke 'none) (o stroke-width 1))
 	(sqr 0 0 width fill opacity stroke stroke-width))
+
+(def line (x1 y1 x2 y2 color (o width 1) (o opacity 1))
+	(let u (uniq)
+		(tag (polyline points (tostring:prs x1 y1 x2 y2) fill 'none
+									 stroke color stroke-width width opacity opacity))
+		(svgid u)))
+
+(def line0 (x y color (o width 1) (o opacity 1))
+	(line 0 0 x y color width opacity))
 
 (mac transform (trans . body)
  `(let u (uniq)
@@ -471,7 +478,7 @@ Connection: close")
 (def spaces args
 	(tostring (apply prs args)))
 
-(def line (ps s (o sw 1) (o o 1))
+(def lines (ps s (o sw 1) (o o 1))
 	(tag (polyline points (tostring:prall ps "" " ")
 								 fill 'none stroke s stroke-width sw opacity o)))
 
