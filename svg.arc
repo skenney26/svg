@@ -453,6 +453,32 @@ Connection: close")
 			(bot	 (use ,g))
 			(left	 (use ,g)))))
 
+(def overlap (xs (o n 2) (o wrap))
+	((afn (ys acc)
+		(if wrap
+				(if (no ys)
+						(rev acc)
+						(let y (firstn n ys)
+							(self (cdr ys)
+										(push (if (len< y n)
+															(join y (firstn (- n (len y)) xs))
+															y)
+													acc))))
+				(if (len< ys n)
+						(rev acc)
+						(self (cdr ys)
+									(push (firstn n ys) acc)))))
+	 xs nil))
+
+(defmemo fib (n)
+	(if (< n 2)
+			n
+			(+ (fib (- n 1))
+				 (fib (- n 2)))))
+
+(def fibs (n)
+	(map fib (range 0 n)))
+
 (mac mx (expr)
  `(ppr (macex1 ',expr)))
 
